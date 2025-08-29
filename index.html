@@ -23,20 +23,20 @@
     .ts-in{color:#86efac;font-weight:700}
     .ts-out{color:#fca5a5;font-weight:700}
     button{color:var(--text); border:1px solid #2a3444; padding:16px 18px; border-radius:16px; cursor:pointer; width:100%; font-size:16px}
-    button.primary{background:linear-gradient(180deg,var(--accent),#1e3a8a); border-color:#2563eb; font-weight:600; color:#fff}
-    button#deleteBtn{background:#0f1720}
     table{width:100%; border-collapse:collapse}
     th,td{padding:12px 10px; border-bottom:1px solid #1e2430; text-align:left; vertical-align:middle}
     th{position:sticky; top:0; background:#12161c}
     .hint{color:var(--muted); font-size:13px}
     .thumb{width:64px;height:64px;object-fit:cover;border-radius:12px;border:1px solid #232b39; display:block}
-    footer{position:sticky; bottom:0; background:linear-gradient(180deg, rgba(11,13,16,0), rgba(11,13,16,1) 35%); z-index:5; padding-bottom:calc(env(safe-area-inset-bottom) + 0px);} 
-    .bar{max-width:860px; margin:auto; padding:10px 16px; display:flex; gap:8px; align-items:center; justify-content:space-between} .actions{position:relative; z-index:6} .actions button{position:relative; z-index:7}
+    footer{position:sticky; bottom:0; background:linear-gradient(180deg, rgba(11,13,16,0), rgba(11,13,16,1) 35%); z-index:9999; padding-bottom:calc(env(safe-area-inset-bottom) + 0px);}  
+    .bar{max-width:860px; margin:auto; padding:10px 16px; display:flex; gap:8px; align-items:center; justify-content:space-between}
     .nowrap{white-space:nowrap}
     @media (min-width:720px){ .row{grid-template-columns:1fr 1fr} .actions{grid-template-columns:repeat(2,1fr)} }
+    .trashBtn{background:#17202b;border:1px solid #2a3444;color:#e9eef6;padding:8px 10px;border-radius:10px;font-size:14px;line-height:1;cursor:pointer}
+    .trashBtn:active{transform:scale(0.98)}
   </style>
   <script>
-    const ADMIN_PASSWORD = "admin123"; // change before sharing
+    const ADMIN_PASSWORD = "impactfuture"; // admin password for gated actions
 
     // Storage policy (keeps QuotaExceededError away)
     const MAX_THUMB_EDGE = 320;       // px (smaller = less storage)
@@ -65,8 +65,8 @@
         </div>
       </div>
       <div class="actions">
-        <button class="btn-in" id="checkInBtn">Check in</button>
-        <button class="btn-out" id="checkOutBtn">Check out</button>
+        <button class="btn-in" id="checkInBtn" type="button">Check in</button>
+        <button class="btn-out" id="checkOutBtn" type="button">Check out</button>
       </div>
     </section>
 
@@ -79,6 +79,7 @@
               <th>Photo</th>
               <th>Name</th>
               <th>Submission Time</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -134,7 +135,6 @@
   }
 
   // --- State ---
-  // One-time migration: remove older app keys so trimmed entries are fully culled
   (function migrateCleanOldKeys(){
     try{
       const keep = new Set(['docent-attendance-v4']);
@@ -147,14 +147,12 @@
     }catch{}
   })();
 
-  
   const state = { entries: [] };
   const storageKey = 'docent-attendance-v4';
 
   function load(){
     try{ state.entries = JSON.parse(localStorage.getItem(storageKey)||'[]'); }
     catch{ state.entries=[]; }
-    // Trim on load if previous versions stored too much
     saveWithTrim();
   }
 
@@ -168,20 +166,17 @@
     document.getElementById('usage').textContent = `~${kb} KB (current store)`;
   }
 
-  // Save with automatic trimming by size & count; prevents QuotaExceededError
   function saveWithTrim(maxChars=MAX_STORAGE_CHARS){
-    // Enforce count limit first
     if (state.entries.length > MAX_ENTRIES){
-      state.entries.length = MAX_ENTRIES; // keep newest N (array is newest-first)
+      state.entries.length = MAX_ENTRIES;
       document.getElementById('note').textContent = `Old entries auto-trimmed to ${MAX_ENTRIES} to fit storage.`;
     }
 
     let json = JSON.stringify(state.entries);
     if (json.length > maxChars){
-      // Iteratively drop oldest until fits
       let trimmed = 0;
       while (json.length > maxChars && state.entries.length > 0){
-        state.entries.pop(); // drop oldest
+        state.entries.pop();
         trimmed++;
         json = JSON.stringify(state.entries);
       }
@@ -195,7 +190,6 @@
       updateMeta();
       return true;
     } catch (e){
-      // As a last resort keep pruning until it saves
       let trimmed = 0;
       while(state.entries.length>0){
         state.entries.pop();
@@ -205,14 +199,13 @@
           document.getElementById('note').textContent = `Auto-trimmed ${trimmed} old entr${trimmed===1?'y':'ies'} (quota limit).`;
           updateMeta();
           return true;
-        }catch{ /* keep trimming */ }
+        }catch{ }
       }
       console.warn('Save failed even after trimming.', e);
       return false;
     }
   }
 
-  // --- Render ---
   function render(){
     const tbody = document.querySelector('#logTable tbody');
     tbody.innerHTML='';
@@ -224,20 +217,20 @@
         <td>${i+1}</td>
         <td>${photoCell}</td>
         <td>${e.name||'—'}</td>
-        <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>`;
+        <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>
+        <td><button type="button" class="trashBtn" data-id="${e.id}" title="Delete this entry" aria-label="Delete entry">🗑️</button></td>`;
       tbody.appendChild(tr);
     });
     updateMeta();
   }
 
-  // --- Actions ---
   async function handleSubmit(kind){
     const name = document.getElementById('fullName').value.trim();
     const file = document.getElementById('photo').files[0];
     if (!name){ alert('Please enter your full name.'); return; }
     if (!file){ alert('Please take a photo.'); return; }
 
-    const thumb = await toThumb(file, MAX_THUMB_EDGE); // may return null if browser cannot decode
+    const thumb = await toThumb(file, MAX_THUMB_EDGE);
     const submitted_at = new Date().toISOString();
 
     state.entries.unshift({ id: crypto.randomUUID(), name, thumb, submitted_at, type: kind });
@@ -247,47 +240,51 @@
     document.getElementById('photo').value = '';
   }
 
-  // --- Self-tests (run only with ?test=1, non-destructive) ---
-  function runSelfTests(){
-    console.group('[SelfTests] Storage trimming');
-    try{
-      const testKey = storageKey + '-test';
-      const original = JSON.parse(JSON.stringify(state.entries));
-      // Build many dummy entries with sizeable thumbs (~6KB each) to force trimming
-      const dummy = 'data:image/jpeg;base64,' + 'X'.repeat(6000);
-      state.entries = Array.from({length:50}, (_,i)=>({id:String(i), name:'Test', thumb:dummy, submitted_at:new Date().toISOString()}));
-      // Save with a tiny budget to force trim
-      const ok = (function saveUnderTinyBudget(){
-        const json = JSON.stringify(state.entries);
-        let copy = JSON.parse(json);
-        // tiny budget ~ 25KB
-        let budget = 25_000;
-        let trimmed = 0;
-        while(JSON.stringify(copy).length > budget && copy.length>0){ copy.pop(); trimmed++; }
-        localStorage.setItem(testKey, JSON.stringify(copy));
-        console.assert(trimmed>0, 'Should trim something under tiny budget');
-        return true;
-      })();
-      console.assert(ok, 'Simulated save should succeed');
-      localStorage.removeItem(testKey);
-      state.entries = original; // restore
-      // Additional test: type tagging
-      const original2 = JSON.parse(JSON.stringify(state.entries));
-      state.entries.unshift({id:'t-in', name:'T', thumb:null, submitted_at:new Date().toISOString(), type:'in'});
-      state.entries.unshift({id:'t-out', name:'T', thumb:null, submitted_at:new Date().toISOString(), type:'out'});
-      console.assert(state.entries[0].type==='out' && state.entries[1].type==='in', 'Check-in/out types should be stored');
-      state.entries = original2;
-      console.log('Self-tests passed');
-    }catch(err){ console.warn('Self-tests skipped/failed', err); }
-    console.groupEnd();
-  }
-
-  // Init
+  // --- Init ---
   const RUN_TESTS = new URLSearchParams(location.search).get('test')==='1';
-  load(); render();
-  document.getElementById('checkInBtn').addEventListener('click', ()=>handleSubmit('in'));
-  document.getElementById('checkOutBtn').addEventListener('click', ()=>handleSubmit('out'));
-  if (RUN_TESTS) runSelfTests();
+  try {
+    load();
+    render();
+  } catch (e) { console.error('Init load/render failed', e); }
+
+  // Bind check-in / check-out buttons safely
+  const inBtn = document.getElementById('checkInBtn');
+  const outBtn = document.getElementById('checkOutBtn');
+  if (inBtn) inBtn.addEventListener('click', ()=>handleSubmit('in'));
+  if (outBtn) outBtn.addEventListener('click', ()=>handleSubmit('out'));
+
+  // Row-level delete (admin-gated)
+  (function(){
+    const tbody = document.querySelector('#logTable tbody');
+    if (!tbody) return;
+    tbody.addEventListener('click', function(ev){
+      let el = ev.target;
+      // normalize Text nodes to their parent element
+      if (el && el.nodeType === 3) el = el.parentElement;
+      if (!(el instanceof Element)) return;
+      const btn = el.closest('.trashBtn');
+      if(!btn) return;
+      const id = btn.getAttribute('data-id');
+      const pwd = prompt('Admin password');
+      if (pwd !== ADMIN_PASSWORD){ if (pwd!==null) alert('Incorrect password.'); return; }
+      const before = state.entries.length;
+      state.entries = state.entries.filter(e=>e.id!==id);
+      if (state.entries.length===before){ alert('Entry not found.'); return; }
+      saveWithTrim();
+      render();
+    }, false);
+    // iOS fallback: also listen to pointerup in case click is swallowed
+    tbody.addEventListener('pointerup', function(ev){
+      let el = ev.target;
+      if (el && el.nodeType === 3) el = el.parentElement;
+      if (!(el instanceof Element)) return;
+      const btn = el.closest('.trashBtn');
+      if(!btn) return;
+      btn.click();
+    }, false);
+  })();
+
+  if (RUN_TESTS) { try { runSelfTests(); } catch(e) { console.warn('Self-tests skipped', e); } }
   </script>
 </body>
 </html>
