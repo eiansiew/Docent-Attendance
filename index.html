@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Docent Attendance — Photo Timestamp Logger</title>
+  <style>
+    :root {
+      --bg: #0b0d10; --card:#12161c; --muted:#7c8da5; --text:#e9eef6; --accent:#7dd3fc; --ok:#86efac; --warn:#fde68a; --err:#fca5a5;
+      --radius: 16px;
+    }
+    *{box-sizing:border-box}
+    body{margin:0;font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial; background:var(--bg); color:var(--text)}
+    header{padding:24px 20px 8px; max-width:1100px; margin:auto}
+    h1{margin:0 0 6px; font-size:clamp(20px,3vw,28px)}
+    p.sub{margin:0; color:var(--muted)}
+    main{max-width:1100px; margin:14px auto 80px; padding:0 20px; display:grid; gap:16px; grid-template-columns: 1fr}
+    .card{background:var(--card); border:1px solid #1e2430; padding:16px; border-radius:var(--radius); box-shadow: 0 10px 20px rgba(0,0,0,.25)}
+    label{display:block; font-weight:600; margin-bottom:8px}
+    input[type="text"], input[type="file"], select{width:100%; background:#0f1319; color:var(--text); border:1px solid #1f2733; border-radius:12px; padding:12px 14px}
+    input[type="file"]{padding:10px}
+    .row{display:grid; gap:12px; grid-template-columns: 1fr}
+    .actions{display:flex; gap:10px; flex-wrap:wrap}
+    button{background:#0f1720; color:var(--text); border:1px solid #2a3444; padding:10px 14px; border-radius:12px; cursor:pointer}
+    button.primary{background:linear-gradient(180deg,#1b2a3c,#0f1720); border-color:#2e3a4d}
+    button.good{border-color:#244b35}
+    button.warn{border-color:#5a4a22}
+    button.danger{border-color:#5a2222}
+    .hint{color:var(--muted); font-size:13px}
+    .grid{width:100%; border-collapse:separate; border-spacing:0; overflow:auto}
+    table{width:100%; border-collapse:collapse}
+    th,td{padding:10px; border-bottom:1px solid #1e2430; text-align:left; vertical-align:middle}
+    th{position:sticky; top:0; background:#12161c}
+    .thumb{width:72px; height:72px; object-fit:cover; border-radius:12px; border:1px solid #232b39}
+    .badge{display:inline-block; padding:2px 8px; border-radius:999px; font-size:12px; border:1px solid #2a3444; color:var(--muted)}
+    .ok{color:var(--ok)} .warnc{color:var(--warn)} .err{color:var(--err)}
+    details{margin-top:6px}
+    footer{position:fixed; inset:auto 0 0 0; background:linear-gradient(180deg, rgba(11,13,16,0), rgba(11,13,16,1) 35%);}
+    .bar{max-width:1100px; margin:auto; padding:12px 20px; display:flex; gap:8px; align-items:center; justify-content:space-between}
+    .nowrap{white-space:nowrap}
+    @media (min-width: 860px){ .row{grid-template-columns: 1.1fr 1fr} }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Docent Attendance — Photo Timestamp Logger</h1>
+    <p class="sub">Upload a photo taken on duty. The app extracts EXIF <em>DateTimeOriginal</em> and shows a clear timestamp. All data stays in this browser (local storage). Export CSV anytime.</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <div class="row">
+        <div>
+          <label for="fullName">Full name</label>
+          <input id="fullName" type="text" placeholder="e.g., Tan Wei Ming" autocomplete="name" />
+          <div class="hint">Use your registered name for matching the roster.</div>
+        </div>
+        <div>
+          <label for="photo">Photo (JPEG/HEIC/PNG). Tip: shoot via camera and upload directly.</label>
+          <input id="photo" type="file" accept="image/*" capture="environment" />
+          <div class="hint">Best results: JPEG with EXIF enabled. If EXIF is missing (some apps strip it), the app falls back to file or upload time and flags it.</div>
+        </div>
+      </div>
+      <div class="actions" style="margin-top:12px">
+        <button class="primary" id="addBtn">Add entry</button>
+        <button id="exportBtn" class="good">Export CSV</button>
+        <button id="clearBtn" class="danger" title="Remove all saved entries">Clear all (Admin)</button>
+        <span class="badge" id="tzBadge"></span>
+      </div>
+      <details>
+        <summary>Why time might differ</summary>
+        <div class="hint">Cameras store local time in EXIF. This app converts EXIF to your current timezone. If the camera timezone differed when shooting, you may see an offset. Consider enabling network time on devices.</div>
+      </details>
+    </section>
+
+    <section class="card grid">
+      <div style="overflow:auto">
+        <table id="logTable" aria-label="Attendance log">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Thumbnail</th>
+              <th>Name</th>
+              <th>EXIF Date/Time</th>
+              <th>Fallback</th>
+              <th>Upload Time</th>
+              <th>Notes</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="bar">
+      <div class="hint">Data persists locally. To consolidate, export CSV and share it.</div>
+      <div class="nowrap hint" id="count"></div>
+    </div>
+  </footer>
+
+  <script>
+  async function readEXIFDate(file){
+    const buf = await file.arrayBuffer();
+    const view = new DataView(buf);
+    if (view.getUint16(0, false) !== 0xFFD8) return null;
+    let offset = 2;
+    while (offset < view.byteLength) {
+      if (view.getUint8(offset) !== 0xFF) return null;
+      const marker = view.getUint8(offset+1);
+      const len = view.getUint16(offset+2, false);
+      if (marker === 0xE1) {
+        const start = offset + 4;
+        if (String.fromCharCode(...new Uint8Array(buf, start, 4)) !== 'Exif') break;
+        const tiff = start + 6;
+        const little = view.getUint16(tiff, false) === 0x4949 ? true : false;
+        const firstIFD = view.getUint32(tiff+4, little) + tiff;
+        function readIFD(dirOffset){
+          const entries = view.getUint16(dirOffset, little);
+          for (let i=0;i<entries;i++){
+            const entry = dirOffset + 2 + i*12;
+            const tag = view.getUint16(entry, little);
+            if (tag === 0x8769){
+              const subIFD = tiff + view.getUint32(entry+8, little);
+              const n = view.getUint16(subIFD, little);
+              for (let j=0;j<n;j++){
+                const e2 = subIFD + 2 + j*12;
+                const tag2 = view.getUint16(e2, little);
+                const count2 = view.getUint32(e2+4, little);
+                const v2 = view.getUint32(e2+8, little);
+                if (tag2 === 0x9003){
+                  const off = (count2>4? tiff+v2 : e2+8);
+                  const str = String.fromCharCode(...new Uint8Array(buf, off, count2-1));
+                  return { dto: str };
+                }
+              }
+            }
+          }
+          return null;
+        }
+        const res = readIFD(firstIFD);
+        if (res) return res;
+        break;
+      }
+      if (marker === 0xDA) break;
+      offset += 2 + len;
+    }
+    return null;
+  }
+
+  function parseExifDateToLocal(dateStr){
+    const m = /(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(dateStr||'');
+    if (!m) return null;
+    const [_, y, mo, d, h, mi, s] = m.map(Number);
+    return new Date(y, mo-1, d, h, mi, s);
+  }
+
+  const state = { entries: [] };
+  const storageKey = 'docent-attendance-v1';
+
+  function load(){
+    try{ state.entries = JSON.parse(localStorage.getItem(storageKey)||'[]'); }catch{ state.entries = []; }
+  }
+  function save(){ localStorage.setItem(storageKey, JSON.stringify(state.entries)); }
+
+  function fmt(dt){ return dt ? new Intl.DateTimeFormat(undefined, {year:'numeric',month:'short',day:'2-digit', hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(dt) : '—'; }
+
+  async function toThumb(file, max=640){
+    return new Promise((resolve)=>{
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = ()=>{
+        const r = Math.min(1, max/Math.max(img.width, img.height));
+        const w = Math.round(img.width*r), h = Math.round(img.height*r);
+        const c = document.createElement('canvas'); c.width=w; c.height=h;
+        const ctx = c.getContext('2d'); ctx.drawImage(img,0,0,w,h);
+        c.toBlob(b=>{ resolve({blob:b, dataUrl: c.toDataURL('image/jpeg',0.8)}); URL.revokeObjectURL(url); }, 'image/jpeg', 0.8);
+      };
+      img.onerror = ()=>resolve({blob:null,dataUrl:''});
+      img.src = url;
+    });
+  }
+
+  function render(){
+    const tbody = document.querySelector('#logTable tbody');
+    tbody.innerHTML='';
+    state.entries.forEach((e, i)=>{
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${i+1}</td>
+        <td>${e.thumb? `<img class="thumb" src="${e.thumb}" alt="thumb"/>`:'—'}</td>
+        <td>${e.name||'—'}</td>
+        <td>${e.exif_ts? `<div>${fmt(new Date(e.exif_ts))}</div><div class="hint">${new Date(e.exif_ts).toLocaleString()}</div>`: '<span class="warnc">No EXIF</span>'}</td>
+        <td>${e.file_ts? fmt(new Date(e.file_ts)):'—'}</td>
+        <td>${fmt(new Date(e.upload_ts))}</td>
+        <td>${e.note||''}</td>`;
+      tbody.appendChild(tr);
+    });
+    document.getElementById('count').textContent = `${state.entries.length} entr${state.entries.length===1?'y':'ies'}`;
+  }
+
+  async function handleAdd(){
+    const name = document.getElementById('fullName').value.trim();
+    const file = document.getElementById('photo').files[0];
+    if (!name){ alert('Please enter your full name.'); return; }
+    if (!file){ alert('Please choose a photo.'); return; }
+
+    let exif = null; let exifDt = null; let note = '';
+    try{ exif = await readEXIFDate(file); }catch{}
+    if (exif && exif.dto){ exifDt = parseExifDateToLocal(exif.dto); }
+    if (!exifDt){ note = 'EXIF missing or unreadable; using fallback.'; }
+
+    const fileTs = file.lastModified ? new Date(file.lastModified) : null;
+    const uploadTs = new Date();
+    const thumb = (await toThumb(file, 480)).dataUrl;
+
+    state.entries.unshift({
+      id: crypto.randomUUID(),
+      name,
+      exif_ts: exifDt? exifDt.toISOString(): null,
+      file_ts: fileTs? fileTs.toISOString(): null,
+      upload_ts: uploadTs.toISOString(),
+      note,
+      thumb
+    });
+    save(); render();
+    document.getElementById('photo').value = '';
+  }
+
+  function exportCSV(){
+    const rows = [ ['index','name','exif_iso','file_iso','upload_iso','note'] ];
+    state.entries.forEach((e,i)=>rows.push([i+1, e.name, e.exif_ts||'', e.file_ts||'', e.upload_ts||'', (e.note||'').replaceAll('\n',' ')]));
+    const csv = rows.map(r=> r.map(v=>`"${String(v).replaceAll('"','""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], {type:'text/csv'});
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `docent_attendance_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(a.href);
+  }
+
+  function clearAll(){
+    const pwd = prompt('Enter admin password to clear all entries:');
+    if (pwd === 'admin123'){ // simple password check
+      if (confirm('Delete all entries on this device?')){ state.entries=[]; save(); render(); }
+    } else if (pwd !== null) {
+      alert('Incorrect password.');
+    }
+  }
+
+  load(); render();
+  document.getElementById('addBtn').onclick = handleAdd;
+  document.getElementById('exportBtn').onclick = exportCSV;
+  document.getElementById('clearBtn').onclick = clearAll;
+  document.getElementById('tzBadge').textContent = `Timezone: ${Intl.DateTimeFormat().resolvedOptions().timeZone}`;
+  </script>
+</body>
+</html>
