@@ -3,52 +3,53 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Docent Attendance — Simple Photo Logger</title>
+  <title>Docent Attendance — Shared (Firestore)</title>
   <style>
     :root { --bg:#0b0d10; --card:#12161c; --muted:#7c8da5; --text:#e9eef6; --accent:#3b82f6; }
     *{box-sizing:border-box}
-    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;background:var(--bg);color:var(--text);touch-action:manipulation;-webkit-tap-highlight-color:transparent;padding-bottom:16px}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
+         background:var(--bg);color:var(--text);padding-bottom:16px}
     header{padding:20px 16px 6px; max-width:860px; margin:auto}
     h1{margin:0 0 6px; font-size:clamp(20px,4.5vw,28px)}
     p.sub{margin:0; color:var(--muted); font-size:15px}
     main{max-width:860px; margin:10px auto 80px; padding:0 16px; display:grid; gap:12px}
-    .card{background:var(--card); border:1px solid #1e2430; padding:14px; border-radius:16px; box-shadow:0 10px 20px rgba(0,0,0,.25)}
+    .card{background:var(--card); border:1px solid #1e2430; padding:14px; border-radius:16px;
+          box-shadow:0 10px 20px rgba(0,0,0,.25)}
     label{display:block; font-weight:600; margin-bottom:8px}
-    input[type="text"], input[type="file"]{width:100%; background:#0f1319; color:var(--text); border:1px solid #1f2733; border-radius:14px; padding:14px 16px; font-size:16px}
+    input[type="text"], input[type="file"]{
+      width:100%; background:#0f1319; color:var(--text);
+      border:1px solid #1f2733; border-radius:14px; padding:14px 16px; font-size:16px}
     input[type="file"]{padding:12px}
     .row{display:grid; gap:12px; grid-template-columns:1fr}
     .actions{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px}
-    .btn-in{background:#a7f3d0;color:#0b0d10;border-color:#86efac;font-weight:700}
-    .btn-out{background:#fecaca;color:#0b0d10;border-color:#fca5a5;font-weight:700}
+    .btn-in{background:#a7f3d0;color:#0b0d10;font-weight:700}
+    .btn-out{background:#fecaca;color:#0b0d10;font-weight:700}
     .ts-in{color:#86efac;font-weight:700}
     .ts-out{color:#fca5a5;font-weight:700}
-    button{color:var(--text); border:1px solid #2a3444; padding:16px 18px; border-radius:16px; cursor:pointer; width:100%; font-size:16px}
+    button{border:1px solid #2a3444; padding:16px 18px; border-radius:16px;
+           cursor:pointer; width:100%; font-size:16px}
     table{width:100%; border-collapse:collapse}
     th,td{padding:12px 10px; border-bottom:1px solid #1e2430; text-align:left; vertical-align:middle}
     th{position:sticky; top:0; background:#12161c}
     .hint{color:var(--muted); font-size:13px}
-    .thumb{width:64px;height:64px;object-fit:cover;border-radius:12px;border:1px solid #232b39; display:block}
-    footer{position:sticky; bottom:0; background:linear-gradient(180deg, rgba(11,13,16,0), rgba(11,13,16,1) 35%); z-index:9999; padding-bottom:calc(env(safe-area-inset-bottom) + 0px);}  
-    .bar{max-width:860px; margin:auto; padding:10px 16px; display:flex; gap:8px; align-items:center; justify-content:space-between}
+    .thumb{width:64px;height:64px;object-fit:cover;border-radius:12px;border:1px solid #232b39}
+    footer{position:sticky; bottom:0;
+           background:linear-gradient(180deg, rgba(11,13,16,0), rgba(11,13,16,1) 35%);
+           z-index:2; padding-bottom:calc(env(safe-area-inset-bottom) + 0px);}
+    .bar{max-width:860px; margin:auto; padding:10px 16px;
+         display:flex; gap:8px; align-items:center; justify-content:space-between}
     .nowrap{white-space:nowrap}
-    @media (min-width:720px){ .row{grid-template-columns:1fr 1fr} .actions{grid-template-columns:repeat(2,1fr)} }
-    .trashBtn{background:#17202b;border:1px solid #2a3444;color:#e9eef6;padding:8px 10px;border-radius:10px;font-size:14px;line-height:1;cursor:pointer}
-    .trashBtn:active{transform:scale(0.98)}
+    @media (min-width:720px){ .row{grid-template-columns:1fr 1fr} }
   </style>
   <script>
-    const ADMIN_PASSWORD = "impactfuture"; // admin password for gated actions
-
-    // Storage policy (keeps QuotaExceededError away)
-    const MAX_THUMB_EDGE = 320;       // px (smaller = less storage)
-    const JPEG_QUALITY   = 0.68;      // 0..1
-    const MAX_ENTRIES    = 20;       // safety cap on rows kept
-    const MAX_STORAGE_CHARS = 1_200_000; // ~1.2MB budget for localStorage value (keeps ~20 small thumbs)
+    const MAX_THUMB_EDGE = 320;    // px
+    const JPEG_QUALITY   = 0.68;   // quality
   </script>
 </head>
 <body>
   <header>
     <h1>Docent Attendance</h1>
-    <p class="sub">Enter your name, take a photo on the spot, and submit. The system records the submission time.</p>
+    <p class="sub">Shared log: everyone at this link sees the same entries. Take a photo on the spot and submit.</p>
   </header>
 
   <main>
@@ -60,7 +61,9 @@
         </div>
         <div>
           <label for="photo">Photo (opens camera)</label>
-          <input id="photo" type="file" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" />
+          <input id="photo" type="file"
+                 accept="image/jpeg,image/png,image/heic,image/heif"
+                 capture="environment" />
           <div class="hint">Use the camera prompt (don’t pick from the gallery) for on-the-spot proof.</div>
         </div>
       </div>
@@ -79,7 +82,6 @@
               <th>Photo</th>
               <th>Name</th>
               <th>Submission Time</th>
-              <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -90,201 +92,103 @@
 
   <footer>
     <div class="bar">
-      <div class="hint" id="note">Entries save on this device. Auto-keeps the latest 20 entries; older ones are removed.</div>
+      <div class="hint" id="note">Shared via Firebase Firestore. Anyone can add & view; deletes disabled.</div>
       <div class="nowrap hint" id="count"></div>
-      <div class="nowrap hint" id="usage"></div>
     </div>
   </footer>
 
   <script type="module">
-  // --- Thumbnail helper (always stores compact JPEG when possible) ---
-  async function toThumb(file, max=MAX_THUMB_EDGE){
-    return new Promise((resolve)=>{
-      const img = new Image();
-      const url = URL.createObjectURL(file);
-      img.onload = ()=>{
-        const r = Math.min(1, max/Math.max(img.width, img.height));
-        const w = Math.round(img.width*r), h = Math.round(img.height*r);
-        const c = document.createElement('canvas'); c.width=w; c.height=h;
-        c.getContext('2d').drawImage(img,0,0,w,h);
-        const dataUrl = c.toDataURL('image/jpeg',JPEG_QUALITY);
-        URL.revokeObjectURL(url);
-        resolve(dataUrl);
-      };
-      img.onerror = ()=>{
-        URL.revokeObjectURL(url);
-        // Fallback for browsers that only decode HEIC from dataURL (e.g., iOS Safari)
-        const reader = new FileReader();
-        reader.onload = e => {
-          const img2 = new Image();
-          img2.onload = ()=>{
-            const r = Math.min(1, max/Math.max(img2.width, img2.height));
-            const w = Math.round(img2.width*r), h = Math.round(img2.height*r);
-            const c = document.createElement('canvas'); c.width=w; c.height=h;
-            c.getContext('2d').drawImage(img2,0,0,w,h);
-            resolve(c.toDataURL('image/jpeg', JPEG_QUALITY));
-          };
-          img2.onerror = ()=> resolve(null); // not decodable → no preview
-          img2.src = e.target?.result || '';
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
+    import { getFirestore, collection, addDoc, serverTimestamp,
+             query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+
+    // 🔑 Replace with your Firebase config
+    const firebaseConfig = {
+      apiKey: "AIzaSyCNZA42W4bw-64WmxpDE5a8dLi7f940G2c",
+      authDomain: "docent-attendance.firebaseapp.com",
+      projectId: "docent-attendance",
+      storageBucket: "docent-attendance.firebasestorage.app",
+      messagingSenderId: "655144848908",
+      appId: "1:655144848908:web:3041b176e69d162adda829"
+    };
+
+    const app = initializeApp(firebaseConfig);
+    const db  = getFirestore(app);
+    const entriesRef = collection(db, "entries");
+
+    async function toThumb(file, max=MAX_THUMB_EDGE){
+      return new Promise((resolve)=>{
+        const img = new Image();
+        const url = URL.createObjectURL(file);
+        img.onload = ()=>{
+          const r = Math.min(1, max/Math.max(img.width, img.height));
+          const w = Math.round(img.width*r), h = Math.round(img.height*r);
+          const c = document.createElement("canvas"); c.width=w; c.height=h;
+          c.getContext("2d").drawImage(img,0,0,w,h);
+          const dataUrl = c.toDataURL("image/jpeg",JPEG_QUALITY);
+          URL.revokeObjectURL(url);
+          resolve(dataUrl);
         };
-        reader.onerror = ()=> resolve(null);
-        reader.readAsDataURL(file);
-      };
-      img.src = url;
-    });
-  }
-
-  // --- State ---
-  (function migrateCleanOldKeys(){
-    try{
-      const keep = new Set(['docent-attendance-v4']);
-      for (let i=0;i<localStorage.length;i++){
-        const k = localStorage.key(i);
-        if (k && /^docent-attendance-v[0-9]+/.test(k) && !keep.has(k)){
-          try{ localStorage.removeItem(k); }catch{}
-        }
-      }
-    }catch{}
-  })();
-
-  const state = { entries: [] };
-  const storageKey = 'docent-attendance-v4';
-
-  function load(){
-    try{ state.entries = JSON.parse(localStorage.getItem(storageKey)||'[]'); }
-    catch{ state.entries=[]; }
-    saveWithTrim();
-  }
-
-  function fmt(dt){ return new Intl.DateTimeFormat(undefined, {year:'numeric',month:'short',day:'2-digit', hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(dt); }
-
-  function approxSizeChars(){ return (localStorage.getItem(storageKey)||'').length; }
-
-  function updateMeta(){
-    document.getElementById('count').textContent = `${state.entries.length} entr${state.entries.length===1?'y':'ies'}`;
-    const kb = (approxSizeChars()/1024).toFixed(0);
-    document.getElementById('usage').textContent = `~${kb} KB (current store)`;
-  }
-
-  function saveWithTrim(maxChars=MAX_STORAGE_CHARS){
-    if (state.entries.length > MAX_ENTRIES){
-      state.entries.length = MAX_ENTRIES;
-      document.getElementById('note').textContent = `Old entries auto-trimmed to ${MAX_ENTRIES} to fit storage.`;
+        img.onerror = ()=> resolve(null);
+        img.src = url;
+      });
     }
 
-    let json = JSON.stringify(state.entries);
-    if (json.length > maxChars){
-      let trimmed = 0;
-      while (json.length > maxChars && state.entries.length > 0){
-        state.entries.pop();
-        trimmed++;
-        json = JSON.stringify(state.entries);
-      }
-      if (trimmed>0){
-        document.getElementById('note').textContent = `Auto-trimmed ${trimmed} old entr${trimmed===1?'y':'ies'} to stay within storage.`;
-      }
+    const state = { entries: [] };
+
+    function fmt(dt){
+      return new Intl.DateTimeFormat(undefined,
+        {year:'numeric',month:'short',day:'2-digit',
+         hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(dt);
     }
 
-    try {
-      localStorage.setItem(storageKey, json);
-      updateMeta();
-      return true;
-    } catch (e){
-      let trimmed = 0;
-      while(state.entries.length>0){
-        state.entries.pop();
-        trimmed++;
-        try{
-          localStorage.setItem(storageKey, JSON.stringify(state.entries));
-          document.getElementById('note').textContent = `Auto-trimmed ${trimmed} old entr${trimmed===1?'y':'ies'} (quota limit).`;
-          updateMeta();
-          return true;
-        }catch{ }
-      }
-      console.warn('Save failed even after trimming.', e);
-      return false;
+    function render(){
+      const tbody = document.querySelector("#logTable tbody");
+      tbody.innerHTML="";
+      state.entries.forEach((e,i)=>{
+        const tr = document.createElement("tr");
+        const tsClass = e.type==="in" ? "ts-in" : (e.type==="out" ? "ts-out" : "");
+        const photoCell = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb"/>` : '<span class="hint">No preview</span>';
+        tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${photoCell}</td>
+          <td>${e.name||"—"}</td>
+          <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>`;
+        tbody.appendChild(tr);
+      });
+      document.getElementById("count").textContent = `${state.entries.length} entries (live)`;
     }
-  }
 
-  function render(){
-    const tbody = document.querySelector('#logTable tbody');
-    tbody.innerHTML='';
-    state.entries.forEach((e, i)=>{
-      const tr = document.createElement('tr');
-      const photoCell = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb"/>` : '<span class="hint">No preview</span>';
-      const tsClass = e.type==='in' ? 'ts-in' : (e.type==='out' ? 'ts-out' : '');
-      tr.innerHTML = `
-        <td>${i+1}</td>
-        <td>${photoCell}</td>
-        <td>${e.name||'—'}</td>
-        <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>
-        <td><button type="button" class="trashBtn" data-id="${e.id}" title="Delete this entry" aria-label="Delete entry">🗑️</button></td>`;
-      tbody.appendChild(tr);
-    });
-    updateMeta();
-  }
+    async function handleSubmit(kind){
+      const name = document.getElementById("fullName").value.trim();
+      const file = document.getElementById("photo").files[0];
+      if (!name){ alert("Please enter your full name."); return; }
+      if (!file){ alert("Please take a photo."); return; }
 
-  async function handleSubmit(kind){
-    const name = document.getElementById('fullName').value.trim();
-    const file = document.getElementById('photo').files[0];
-    if (!name){ alert('Please enter your full name.'); return; }
-    if (!file){ alert('Please take a photo.'); return; }
+      const thumb = await toThumb(file, MAX_THUMB_EDGE);
+      if (!thumb){ alert("Cannot read image. Use JPEG/PNG."); return; }
 
-    const thumb = await toThumb(file, MAX_THUMB_EDGE);
-    const submitted_at = new Date().toISOString();
+      await addDoc(entriesRef, {
+        name, thumb, type: kind,
+        submitted_at: serverTimestamp()
+      });
 
-    state.entries.unshift({ id: crypto.randomUUID(), name, thumb, submitted_at, type: kind });
-    saveWithTrim();
-    render();
+      document.getElementById("photo").value = "";
+    }
 
-    document.getElementById('photo').value = '';
-  }
-
-  // --- Init ---
-  const RUN_TESTS = new URLSearchParams(location.search).get('test')==='1';
-  try {
-    load();
-    render();
-  } catch (e) { console.error('Init load/render failed', e); }
-
-  // Bind check-in / check-out buttons safely
-  const inBtn = document.getElementById('checkInBtn');
-  const outBtn = document.getElementById('checkOutBtn');
-  if (inBtn) inBtn.addEventListener('click', ()=>handleSubmit('in'));
-  if (outBtn) outBtn.addEventListener('click', ()=>handleSubmit('out'));
-
-  // Row-level delete (admin-gated)
-  (function(){
-    const tbody = document.querySelector('#logTable tbody');
-    if (!tbody) return;
-    tbody.addEventListener('click', function(ev){
-      let el = ev.target;
-      // normalize Text nodes to their parent element
-      if (el && el.nodeType === 3) el = el.parentElement;
-      if (!(el instanceof Element)) return;
-      const btn = el.closest('.trashBtn');
-      if(!btn) return;
-      const id = btn.getAttribute('data-id');
-      const pwd = prompt('Admin password');
-      if (pwd !== ADMIN_PASSWORD){ if (pwd!==null) alert('Incorrect password.'); return; }
-      const before = state.entries.length;
-      state.entries = state.entries.filter(e=>e.id!==id);
-      if (state.entries.length===before){ alert('Entry not found.'); return; }
-      saveWithTrim();
+    const q = query(entriesRef, orderBy("submitted_at","desc"), limit(200));
+    onSnapshot(q, (snap)=>{
+      state.entries = snap.docs.map(doc=>{
+        const d = doc.data();
+        const ts = d.submitted_at?.toDate ? d.submitted_at.toDate() : new Date();
+        return { id: doc.id, name: d.name||"", thumb: d.thumb||null,
+                 type: d.type||null, submitted_at: ts.toISOString() };
+      });
       render();
-    }, false);
-    // iOS fallback: also listen to pointerup in case click is swallowed
-    tbody.addEventListener('pointerup', function(ev){
-      let el = ev.target;
-      if (el && el.nodeType === 3) el = el.parentElement;
-      if (!(el instanceof Element)) return;
-      const btn = el.closest('.trashBtn');
-      if(!btn) return;
-      btn.click();
-    }, false);
-  })();
+    });
 
-  if (RUN_TESTS) { try { runSelfTests(); } catch(e) { console.warn('Self-tests skipped', e); } }
+    document.getElementById("checkInBtn").addEventListener("click", ()=>handleSubmit("in"));
+    document.getElementById("checkOutBtn").addEventListener("click", ()=>handleSubmit("out"));
   </script>
 </body>
 </html>
