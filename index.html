@@ -32,19 +32,22 @@
     .trashBtn:active{transform:scale(0.98)}
     @media (min-width:720px){ .row{grid-template-columns:1fr 1fr} }
     
-  .custom-upload-btn {
-  display: inline-block;
-  background: #3b82f6;
-  color: #fff;
-  padding: 12px 18px;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 600;
-  text-align: center;
-}
-.custom-upload-btn:hover {
-  background: #2563eb;
-}
+    .custom-upload-btn {
+      display: block;          /* full-width instead of inline */
+      width: 100%;             /* expand to container width */
+      background: #3b82f6;
+      color: #fff;
+      padding: 14px 16px;      /* match input padding */
+      border-radius: 12px;
+      cursor: pointer;
+      font-weight: 600;
+      text-align: center;
+      font-size: 16px;         /* align with input font size */
+    }
+    .custom-upload-btn:hover {
+      background: #2563eb;
+    }
+
 
   </style>
   <script>
