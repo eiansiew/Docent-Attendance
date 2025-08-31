@@ -31,6 +31,21 @@
     .trashBtn{background:#17202b;border:1px solid #2a3444;color:#e9eef6;padding:8px 10px;border-radius:10px;font-size:14px;line-height:1;cursor:pointer}
     .trashBtn:active{transform:scale(0.98)}
     @media (min-width:720px){ .row{grid-template-columns:1fr 1fr} }
+    
+  .custom-upload-btn {
+  display: inline-block;
+  background: #3b82f6;
+  color: #fff;
+  padding: 12px 18px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-weight: 600;
+  text-align: center;
+}
+.custom-upload-btn:hover {
+  background: #2563eb;
+}
+
   </style>
   <script>
     const MAX_THUMB_EDGE = 320;
@@ -50,23 +65,26 @@
   </header>
 
   <main>
-    <section class="card">
-      <div class="row">
-        <div>
-          <label for="fullName">Full name</label>
-          <input id="fullName" type="text" placeholder="e.g., Tan Wei Ming" autocomplete="name" />
-        </div>
-        <div>
-          <label for="photo">Photo (opens camera)</label>
-          <input id="photo" type="file" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" />
-          <div class="hint">Use the camera prompt for on-the-spot proof.</div>
-        </div>
+  <section class="card">
+    <div class="row">
+      <div>
+        <label for="fullName">Full name</label>
+        <input id="fullName" type="text" placeholder="e.g., Tan Wei Ming" autocomplete="name" />
       </div>
-      <div class="actions">
-        <button class="btn-in" id="checkInBtn" type="button">Check in</button>
-        <button class="btn-out" id="checkOutBtn" type="button">Check out</button>
+      <div>
+        <label for="photo">Photo</label>
+        <!-- hidden input -->
+        <input id="photo" type="file" accept="image/*" capture="environment" style="display:none;" />
+        <!-- custom button -->
+        <label for="photo" class="custom-upload-btn">📷 Take a picture</label>
+        <div class="hint">Use the camera prompt for on-the-spot proof.</div>
       </div>
-    </section>
+    </div>
+    <div class="actions">
+      <button class="btn-in" id="checkInBtn">Check in</button>
+      <button class="btn-out" id="checkOutBtn">Check out</button>
+    </div>
+  </section>
 
     <section class="card">
       <div style="overflow:auto">
