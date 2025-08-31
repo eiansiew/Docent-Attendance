@@ -46,7 +46,7 @@
 <body>
   <header>
     <h1>Docent Attendance</h1>
-    <p class="sub">Shared log: everyone at this link sees the same entries. Take a photo on the spot and submit.</p>
+    <p class="sub">Shared log: everyone will be able to view all entries. Take a photo of youreself in the exhibition and submit.</p>
   </header>
 
   <main>
@@ -59,7 +59,7 @@
         <div>
           <label for="photo">Photo (opens camera)</label>
           <input id="photo" type="file" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" />
-          <div class="hint">Use the camera prompt (don’t pick from the gallery) for on-the-spot proof.</div>
+          <div class="hint">Use the camera prompt for on-the-spot proof.</div>
         </div>
       </div>
       <div class="actions">
@@ -88,7 +88,7 @@
 
   <footer>
     <div class="hint" style="max-width:860px;margin:8px auto 0;padding:0 16px;">
-      Anyone can add & view. Row deletes are admin-only (password required).
+     Docents to add check in & check out entries. Row deletes are admin-only (password required).
     </div>
   </footer>
 
@@ -184,27 +184,41 @@
     document.getElementById("checkInBtn").addEventListener("click", ()=>handleSubmit("in"));
     document.getElementById("checkOutBtn").addEventListener("click", ()=>handleSubmit("out"));
 
-    // Row delete (admin only): event delegation on <tbody>
-    tbody.addEventListener("click", async (ev)=>{
-      const btn = ev.target.closest?.(".trashBtn");
-      if (!btn) return;
-      const pwd = prompt("Admin password:");
-      if (pwd == null) return;
-      // Optional trivial pre-check (keeps UX same as you wanted)
-      if (pwd !== ADMIN_PASSWORD_HINT){ alert("Incorrect password."); return; }
+  // Row delete (admin via Email/Password)
+  tbody.addEventListener("click", async (ev)=>{
+  const btn = ev.target.closest?.(".trashBtn");
+  if (!btn) return;
 
-      try {
-        // Sign in admin to authorize delete in rules
-        await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pwd);
-        const id = btn.getAttribute("data-id");
-        await deleteDoc(doc(db, "entries", id));
-      } catch (err) {
-        alert("Delete failed (auth or rules).");
-        console.error(err);
-      } finally {
-        try { await signOut(auth); } catch {}
-      }
-    });
+  const id  = btn.getAttribute("data-id");
+  const pwd = prompt("Admin password:");
+  if (pwd == null) return;
+
+  try {
+    // 1) Sign in
+    const cred = await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pwd);
+    // Optional: confirm who we are
+    console.log("[Auth] signed in as", cred.user?.email);
+
+    // 2) Attempt delete (WILL FAIL if rules still say delete:false)
+    await deleteDoc(doc(db, "entries", id));
+  } catch (err) {
+    // Show concrete reason
+    const code = err?.code || "";
+    if (code.startsWith("auth/")) {
+      alert(`Sign-in failed: ${code}. Check admin email exists & password matches.`);
+    } else if (code === "permission-denied") {
+      alert("Delete blocked by Firestore rules (permission-denied). " +
+            "Either your rules still have 'delete: if false' or the rule email doesn't match.");
+    } else {
+      alert(`Delete failed: ${code || err}`);
+    }
+    console.error(err);
+    return;
+  } finally {
+    try { await signOut(auth); } catch {}
+  }
+});
+
   </script>
 </body>
 </html>
