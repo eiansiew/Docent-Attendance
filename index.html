@@ -7,18 +7,14 @@
   <style>
     :root { --bg:#0b0d10; --card:#12161c; --muted:#7c8da5; --text:#e9eef6; --accent:#3b82f6; }
     *{box-sizing:border-box}
-    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;
-         background:var(--bg);color:var(--text);padding-bottom:16px}
+    body{margin:0;font-family:ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial;background:var(--bg);color:var(--text);padding-bottom:16px}
     header{padding:20px 16px 6px; max-width:860px; margin:auto}
     h1{margin:0 0 6px; font-size:clamp(20px,4.5vw,28px)}
     p.sub{margin:0; color:var(--muted); font-size:15px}
     main{max-width:860px; margin:10px auto 80px; padding:0 16px; display:grid; gap:12px}
-    .card{background:var(--card); border:1px solid #1e2430; padding:14px; border-radius:16px;
-          box-shadow:0 10px 20px rgba(0,0,0,.25)}
+    .card{background:var(--card); border:1px solid #1e2430; padding:14px; border-radius:16px; box-shadow:0 10px 20px rgba(0,0,0,.25)}
     label{display:block; font-weight:600; margin-bottom:8px}
-    input[type="text"], input[type="file"]{
-      width:100%; background:#0f1319; color:var(--text);
-      border:1px solid #1f2733; border-radius:14px; padding:14px 16px; font-size:16px}
+    input[type="text"], input[type="file"]{width:100%; background:#0f1319; color:var(--text); border:1px solid #1f2733; border-radius:14px; padding:14px 16px; font-size:16px}
     input[type="file"]{padding:12px}
     .row{display:grid; gap:12px; grid-template-columns:1fr}
     .actions{display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px}
@@ -26,24 +22,25 @@
     .btn-out{background:#fecaca;color:#0b0d10;font-weight:700}
     .ts-in{color:#86efac;font-weight:700}
     .ts-out{color:#fca5a5;font-weight:700}
-    button{border:1px solid #2a3444; padding:16px 18px; border-radius:16px;
-           cursor:pointer; width:100%; font-size:16px}
+    button{border:1px solid #2a3444; padding:16px 18px; border-radius:16px; cursor:pointer; width:100%; font-size:16px}
     table{width:100%; border-collapse:collapse}
     th,td{padding:12px 10px; border-bottom:1px solid #1e2430; text-align:left; vertical-align:middle}
     th{position:sticky; top:0; background:#12161c}
     .hint{color:var(--muted); font-size:13px}
     .thumb{width:64px;height:64px;object-fit:cover;border-radius:12px;border:1px solid #232b39}
-    footer{position:sticky; bottom:0;
-           background:linear-gradient(180deg, rgba(11,13,16,0), rgba(11,13,16,1) 35%);
-           z-index:2; padding-bottom:calc(env(safe-area-inset-bottom) + 0px);}
-    .bar{max-width:860px; margin:auto; padding:10px 16px;
-         display:flex; gap:8px; align-items:center; justify-content:space-between}
-    .nowrap{white-space:nowrap}
+    .trashBtn{background:#17202b;border:1px solid #2a3444;color:#e9eef6;padding:8px 10px;border-radius:10px;font-size:14px;line-height:1;cursor:pointer}
+    .trashBtn:active{transform:scale(0.98)}
     @media (min-width:720px){ .row{grid-template-columns:1fr 1fr} }
   </style>
   <script>
-    const MAX_THUMB_EDGE = 320;    // px
-    const JPEG_QUALITY   = 0.68;   // quality
+    const MAX_THUMB_EDGE = 320;
+    const JPEG_QUALITY   = 0.68;
+
+    // 👇 Set this to the email of the admin account you’ll create in Firebase Auth.
+    const ADMIN_EMAIL = "your-admin-email@example.com";
+
+    // Optional: if you want to hard-gate with a specific string before trying to sign in.
+    const ADMIN_PASSWORD_HINT = "impactfuture";
   </script>
 </head>
 <body>
@@ -61,9 +58,7 @@
         </div>
         <div>
           <label for="photo">Photo (opens camera)</label>
-          <input id="photo" type="file"
-                 accept="image/jpeg,image/png,image/heic,image/heif"
-                 capture="environment" />
+          <input id="photo" type="file" accept="image/jpeg,image/png,image/heic,image/heif" capture="environment" />
           <div class="hint">Use the camera prompt (don’t pick from the gallery) for on-the-spot proof.</div>
         </div>
       </div>
@@ -82,6 +77,7 @@
               <th>Photo</th>
               <th>Name</th>
               <th>Submission Time</th>
+              <th>Actions</th>
             </tr>
           </thead>
           <tbody></tbody>
@@ -91,18 +87,19 @@
   </main>
 
   <footer>
-    <div class="bar">
-      <div class="hint" id="note">Shared via Firebase Firestore. Anyone can add & view; deletes disabled.</div>
-      <div class="nowrap hint" id="count"></div>
+    <div class="hint" style="max-width:860px;margin:8px auto 0;padding:0 16px;">
+      Anyone can add & view. Row deletes are admin-only (password required).
     </div>
   </footer>
 
   <script type="module">
+    // --- Firebase (CDN v11) ---
     import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-app.js";
     import { getFirestore, collection, addDoc, serverTimestamp,
-             query, orderBy, limit, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+             query, orderBy, limit, onSnapshot, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-firestore.js";
+    import { getAuth, signInWithEmailAndPassword, signOut } from "https://www.gstatic.com/firebasejs/11.0.1/firebase-auth.js";
 
-    // 🔑 Replace with your Firebase config
+    // 🔑 Replace with your own Firebase config
     const firebaseConfig = {
       apiKey: "AIzaSyCNZA42W4bw-64WmxpDE5a8dLi7f940G2c",
       authDomain: "docent-attendance.firebaseapp.com",
@@ -112,10 +109,12 @@
       appId: "1:655144848908:web:3041b176e69d162adda829"
     };
 
-    const app = initializeApp(firebaseConfig);
-    const db  = getFirestore(app);
+    const app  = initializeApp(firebaseConfig);
+    const db   = getFirestore(app);
+    const auth = getAuth(app);
     const entriesRef = collection(db, "entries");
 
+    // --- Thumb helper ---
     async function toThumb(file, max=MAX_THUMB_EDGE){
       return new Promise((resolve)=>{
         const img = new Image();
@@ -135,28 +134,28 @@
     }
 
     const state = { entries: [] };
+    const tbody = document.querySelector("#logTable tbody");
 
     function fmt(dt){
       return new Intl.DateTimeFormat(undefined,
-        {year:'numeric',month:'short',day:'2-digit',
-         hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(dt);
+        {year:'numeric',month:'short',day:'2-digit',hour:'2-digit',minute:'2-digit',second:'2-digit'}).format(dt);
     }
 
     function render(){
-      const tbody = document.querySelector("#logTable tbody");
-      tbody.innerHTML="";
+      tbody.innerHTML = "";
       state.entries.forEach((e,i)=>{
         const tr = document.createElement("tr");
-        const tsClass = e.type==="in" ? "ts-in" : (e.type==="out" ? "ts-out" : "");
-        const photoCell = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb"/>` : '<span class="hint">No preview</span>';
+        const tsClass = e.type === "in" ? "ts-in" : (e.type === "out" ? "ts-out" : "");
+        const photo = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb">` : '<span class="hint">No preview</span>';
         tr.innerHTML = `
           <td>${i+1}</td>
-          <td>${photoCell}</td>
+          <td>${photo}</td>
           <td>${e.name||"—"}</td>
-          <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>`;
+          <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>
+          <td><button type="button" class="trashBtn" data-id="${e.id}" aria-label="Delete">🗑️</button></td>`;
         tbody.appendChild(tr);
       });
-      document.getElementById("count").textContent = `${state.entries.length} entries (live)`;
+      document.getElementById("count")?.remove(); // optional
     }
 
     async function handleSubmit(kind){
@@ -164,31 +163,48 @@
       const file = document.getElementById("photo").files[0];
       if (!name){ alert("Please enter your full name."); return; }
       if (!file){ alert("Please take a photo."); return; }
-
       const thumb = await toThumb(file, MAX_THUMB_EDGE);
       if (!thumb){ alert("Cannot read image. Use JPEG/PNG."); return; }
-
-      await addDoc(entriesRef, {
-        name, thumb, type: kind,
-        submitted_at: serverTimestamp()
-      });
-
+      await addDoc(entriesRef, { name, thumb, type: kind, submitted_at: serverTimestamp() });
       document.getElementById("photo").value = "";
     }
 
+    // Live feed
     const q = query(entriesRef, orderBy("submitted_at","desc"), limit(200));
     onSnapshot(q, (snap)=>{
-      state.entries = snap.docs.map(doc=>{
-        const d = doc.data();
-        const ts = d.submitted_at?.toDate ? d.submitted_at.toDate() : new Date();
-        return { id: doc.id, name: d.name||"", thumb: d.thumb||null,
-                 type: d.type||null, submitted_at: ts.toISOString() };
+      state.entries = snap.docs.map(d=>{
+        const x = d.data();
+        const ts = x.submitted_at?.toDate ? x.submitted_at.toDate() : new Date();
+        return { id:d.id, name:x.name||"", thumb:x.thumb||null, type:x.type||null, submitted_at: ts.toISOString() };
       });
       render();
     });
 
+    // Bind submit buttons
     document.getElementById("checkInBtn").addEventListener("click", ()=>handleSubmit("in"));
     document.getElementById("checkOutBtn").addEventListener("click", ()=>handleSubmit("out"));
+
+    // Row delete (admin only): event delegation on <tbody>
+    tbody.addEventListener("click", async (ev)=>{
+      const btn = ev.target.closest?.(".trashBtn");
+      if (!btn) return;
+      const pwd = prompt("Admin password:");
+      if (pwd == null) return;
+      // Optional trivial pre-check (keeps UX same as you wanted)
+      if (pwd !== ADMIN_PASSWORD_HINT){ alert("Incorrect password."); return; }
+
+      try {
+        // Sign in admin to authorize delete in rules
+        await signInWithEmailAndPassword(auth, ADMIN_EMAIL, pwd);
+        const id = btn.getAttribute("data-id");
+        await deleteDoc(doc(db, "entries", id));
+      } catch (err) {
+        alert("Delete failed (auth or rules).");
+        console.error(err);
+      } finally {
+        try { await signOut(auth); } catch {}
+      }
+    });
   </script>
 </body>
 </html>
