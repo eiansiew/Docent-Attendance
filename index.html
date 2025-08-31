@@ -40,7 +40,7 @@
     const ADMIN_EMAIL = "sieweian23@gmail.com";
 
     // Optional: if you want to hard-gate with a specific string before trying to sign in.
-    const ADMIN_PASSWORD_HINT = "impactfuture";
+    const ADMIN_PASSWORD_HINT = "3impactfuture";
   </script>
 </head>
 <body>
@@ -142,21 +142,25 @@
     }
 
     function render(){
-      tbody.innerHTML = "";
-      state.entries.forEach((e,i)=>{
-        const tr = document.createElement("tr");
-        const tsClass = e.type === "in" ? "ts-in" : (e.type === "out" ? "ts-out" : "");
-        const photo = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb">` : '<span class="hint">No preview</span>';
-        tr.innerHTML = `
-          <td>${i+1}</td>
-          <td>${photo}</td>
-          <td>${e.name||"—"}</td>
-          <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>
-          <td><button type="button" class="trashBtn" data-id="${e.id}" aria-label="Delete">🗑️</button></td>`;
-        tbody.appendChild(tr);
-      });
-      document.getElementById("count")?.remove(); // optional
-    }
+  tbody.innerHTML = "";
+
+  // Oldest → newest (so earliest is #1)
+  state.entries.slice().reverse().forEach((e, i)=>{
+    const tr = document.createElement("tr");
+    const tsClass = e.type === "in" ? "ts-in" : (e.type === "out" ? "ts-out" : "");
+    const photo = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb">` : '<span class="hint">No preview</span>';
+    tr.innerHTML = `
+      <td>${i+1}</td>
+      <td>${photo}</td>
+      <td>${e.name||"—"}</td>
+      <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>
+      <td><button type="button" class="trashBtn" data-id="${e.id}" aria-label="Delete">🗑️</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  document.getElementById("count")?.remove(); // optional
+}
+
 
     async function handleSubmit(kind){
       const name = document.getElementById("fullName").value.trim();
