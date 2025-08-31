@@ -150,7 +150,7 @@
     const tsClass = e.type === "in" ? "ts-in" : (e.type === "out" ? "ts-out" : "");
     const photo = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb">` : '<span class="hint">No preview</span>';
     tr.innerHTML = `
-      <td>${i+1}</td>
+      <td>${state.entries.length - i}</td>
       <td>${photo}</td>
       <td>${e.name||"—"}</td>
       <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>
