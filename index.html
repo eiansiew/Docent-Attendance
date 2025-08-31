@@ -142,24 +142,25 @@
     }
 
     function render(){
-  tbody.innerHTML = "";
+      tbody.innerHTML = "";
+      state.entries.forEach((e, i)=>{
+        const tsClass = e.type === "in" ? "ts-in" : (e.type === "out" ? "ts-out" : "");
+        const photo = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb">`
+                              : '<span class="hint">No preview</span>';
+        const rowNumber = state.entries.length - i;  // <-- highest number for newest at top
+        const dt = fmt(new Date(e.submitted_at));
+    
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${rowNumber}</td>
+          <td>${photo}</td>
+          <td>${e.name||"—"}</td>
+          <td class="${tsClass}">${dt}</td>
+          <td><button type="button" class="trashBtn" data-id="${e.id}" aria-label="Delete">🗑️</button></td>`;
+        tbody.appendChild(tr);
+      });
+    }
 
-  // Oldest → newest (so earliest is #1)
-  state.entries.slice().reverse().forEach((e, i)=>{
-    const tr = document.createElement("tr");
-    const tsClass = e.type === "in" ? "ts-in" : (e.type === "out" ? "ts-out" : "");
-    const photo = e.thumb ? `<img class="thumb" src="${e.thumb}" alt="thumb">` : '<span class="hint">No preview</span>';
-    tr.innerHTML = `
-      <td>${state.entries.length - i}</td>
-      <td>${photo}</td>
-      <td>${e.name||"—"}</td>
-      <td class="${tsClass}">${fmt(new Date(e.submitted_at))}</td>
-      <td><button type="button" class="trashBtn" data-id="${e.id}" aria-label="Delete">🗑️</button></td>`;
-    tbody.appendChild(tr);
-  });
-
-  document.getElementById("count")?.remove(); // optional
-}
 
 
     async function handleSubmit(kind){
